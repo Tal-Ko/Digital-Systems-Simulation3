@@ -28,11 +28,13 @@
      input logic [1:0] wbsel,
      input logic regwen,
      input logic [1:0] immsel,
-     input logic asel,
+     input logic [1:0] asel,
      input logic bsel,
      input logic [3:0] alusel,
      input logic mdrwrite,
-     
+     input logic datawregen,
+     input logic datawsel,
+
      // Clock and reset
      input logic clk,
      input logic rst
@@ -42,7 +44,7 @@
  `include "params.inc"
 
  // Stage registers
- logic [DPWIDTH-1:0] pc, pcc, ir, a, b, aluout, mdr;
+ logic [DPWIDTH-1:0] pc, pcc, ir, a, b, dataw, aluout, mdr;
 
  // Fetch
  assign imem_addr = pc;
@@ -54,7 +56,7 @@
          pc     <= 0;
      else if (pcwrite)
          pc     <= (pcsourse == PC_ALU) ? aluout : pc + 4;
- 
+
  // PCC
  // ===
  always_ff @(posedge clk or posedge rst)
@@ -62,7 +64,7 @@
          pcc    <= 0;
      else if (pccen)
          pcc    <= pc;
- 
+
  // IR
  // ==
  always_ff @(posedge clk or posedge rst)
@@ -71,7 +73,7 @@
      else if (irwrite)
          ir     <= imem_datain;
  assign instr = ir;
- 
+
  // Register file inputs
  // ====================
  logic [DPWIDTH-1:0] datad;
@@ -87,7 +89,7 @@
  assign addrb = ir[24:20];
  assign addrd = ir[11:7];
 
- 
+
  // Register File
  // =============
  logic [DPWIDTH-1:0] rf [RFSIZE-1:1];
@@ -110,7 +112,7 @@
 
  // ALU
  // ===
- 
+
  // Immediate selector
  logic [DPWIDTH-1:0] imm;
  always_comb
@@ -125,7 +127,14 @@
 
  // ALU input A
  logic [DPWIDTH-1:0] alu_a;
- assign alu_a = (asel == ALUA_REG) ? a : pcc;
+ always_comb begin
+    case (asel)
+        ALUA_PCC:  alu_a = pcc;
+        ALUA_REG:  alu_a = a;
+        ALUA_ZERO: alu_a = {DPWIDTH{1'b0}};
+        default:   alu_a = pcc;
+    endcase
+ end
 
  // ALU input A
  logic [DPWIDTH-1:0] alu_b;
@@ -157,16 +166,27 @@
  assign zero = (alu_result == 0);
 
  always_ff @(posedge clk or posedge rst)
-     if (rst)
+     if (rst) begin
          aluout     <= 0;
-     else
+         dataw      <= 0;
+     end else begin
          aluout     <= alu_result;
+         if (datawregen) begin
+            dataw   <= alu_result;
+         end
+     end
 
 
  // Memory
  // ======
  assign dmem_addr = aluout;
- assign dmem_dataout = b;
+
+ always_comb begin
+     case (datawsel)
+         DATAW_B:    assign dmem_dataout = b;
+         DATAW_REG:  assign dmem_dataout = dataw;
+     endcase
+ end
 
  always_ff @(posedge clk or posedge rst)
      if (rst)

@@ -20,16 +20,18 @@
      output logic [1:0] wbsel,
      output logic regwen,
      output logic [1:0] immsel,
-     output logic asel,
+     output logic [1:0] asel,
      output logic bsel,
      output logic [3:0] alusel,
      output logic mdrwrite,
-     
+     output logic datawregen,
+     output logic datawsel,
+
      // Clock and reset
      input logic clk,
      input logic rst
  );
- 
+
  // Design parameters
  `include "params.inc"
 
@@ -48,7 +50,9 @@
     RTYPE_ALU   = 6,
     RTYPE_WB    = 7,
     BEQ_EXEC    = 8,
-    JAL_EXEC    = 9
+    JAL_EXEC    = 9,
+    SW2_ALU     = 10,
+    SW2_MEM     = 11
 	} sm_type;
 
 sm_type current,next;
@@ -74,21 +78,25 @@ sm_type current,next;
             casex (opcode_funct3)
                 LW:     next = LSW_ADDR;
                 SW:     next = LSW_ADDR;
+                SW2:    next = LSW_ADDR;
                 ALU:    next = RTYPE_ALU;
                 BEQ:    next = BEQ_EXEC;
                 JAL:    next = JAL_EXEC;
                 // For unimplemented instructions do nothing
-                default:next = FETCH; 
+                default:next = FETCH;
             endcase
         end
         LSW_ADDR: begin
             casex (opcode_funct3)
                 LW:     next = LW_MEM;
                 SW:     next = SW_MEM;
+                SW2:    next = SW2_ALU;
                 // This is never reached
                 default:next = SW_MEM;
             endcase
         end
+        SW2_ALU:
+            next = SW2_MEM;
         LW_MEM:
             next = LW_WB;
         LW_WB:
@@ -110,10 +118,10 @@ sm_type current,next;
 
  // State Machine Outputs
  // ~~~~~~~~~~~~~~~~~~~~~
- 
+
  always_comb
  begin
-     // Default values of all the controls to avoid latches
+    // Default values of all the controls to avoid latches
     pcsourse = PC_INC;
     pcwrite = 1'b0;
     pccen = 1'b0;
@@ -126,6 +134,8 @@ sm_type current,next;
     alusel = ALU_ADD;
     mdrwrite = 1'b0;
     memrw = 1'b0;
+    datawsel = DATAW_B;
+    datawregen = 1'b0;
     case (current)
         FETCH:
         begin
@@ -141,7 +151,23 @@ sm_type current,next;
             alusel      = ALU_ADD;
         end
         LSW_ADDR: begin
-            immsel      = (opcode_funct3 == LW) ? IMM_L : IMM_S;
+            asel        = ALUA_REG;
+            bsel        = ALUB_IMM;
+            alusel      = ALU_ADD;
+            case (opcode_funct3)
+                LW: immsel = IMM_L;
+                SW: immsel = IMM_S;
+                SW2: begin
+                    immsel      = IMM_S;
+                    asel        = ALUA_ZERO;
+                    bsel        = ALUB_REG;
+                    alusel      = ALU_SUB;
+                    datawregen  = 1'b1;
+                end
+            endcase
+        end
+        SW2_ALU: begin
+            immsel      = IMM_S;
             asel        = ALUA_REG;
             bsel        = ALUB_IMM;
             alusel      = ALU_ADD;
@@ -154,6 +180,10 @@ sm_type current,next;
         end
         SW_MEM:
             memrw       = 1'b1;
+        SW2_MEM: begin
+            memrw       = 1'b1;
+            datawsel    = DATAW_REG;
+        end
         RTYPE_ALU: begin
             asel        = ALUA_REG;
             bsel        = ALUB_REG;

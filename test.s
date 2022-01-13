@@ -1,11 +1,15 @@
 .text
 main:   # Start of your code
+        lw t0, 8(x0)
+        lw t1, 12(x0)
 
+        sw2 t0, 16(x0)
+        sw2 t1, 20(x0)
         # End of your code
         add		t6, x0, x0
         beq		t6, x0, finish
 
-deadend: beq	t6, x0, deadend        
+deadend: beq	t6, x0, deadend
 
 finish:
         lw		t4, 0(x0)

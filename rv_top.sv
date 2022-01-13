@@ -37,11 +37,13 @@
  logic [1:0] wbsel;
  logic regwen;
  logic [1:0] immsel;
- logic asel;
+ logic [1:0] asel;
  logic bsel;
  logic [3:0] alusel;
  logic mdrwrite;
-     
+ logic datawregen;
+ logic datawsel;
+
  // Data path
  // =========
  rv_dp
@@ -72,7 +74,9 @@
      .bsel(bsel),
      .alusel(alusel),
      .mdrwrite(mdrwrite),
-     
+     .datawregen(datawregen),
+     .datawsel(datawsel),
+
      // Clock and reset
      .clk(clk),
      .rst(rst)
@@ -100,10 +104,12 @@
      .bsel(bsel),
      .alusel(alusel),
      .mdrwrite(mdrwrite),
-     
+     .datawregen(datawregen),
+     .datawsel(datawsel),
+
      // Clock and reset
      .clk(clk),
      .rst(rst)
  );
- 
+
  endmodule
